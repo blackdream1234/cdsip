@@ -1,0 +1,23 @@
+[package]
+name = "cdsip-tool-broker"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cdsip-domain-models = { path = "../domain-models" }
+cdsip-policy-engine = { path = "../policy-engine" }
+cdsip-audit-core = { path = "../audit-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+# Nmap XML parsing
+quick-xml = { version = "0.37", features = ["serialize"] }
+
+[dev-dependencies]
+tokio-test = { workspace = true }

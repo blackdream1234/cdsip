@@ -1,0 +1,75 @@
+# =============================================================================
+# CDSIP API Server — Multi-stage Rust Build
+# =============================================================================
+# Security: non-root user, minimal runtime image, no dev tools in production
+# =============================================================================
+
+FROM rust:1.85-bookworm AS builder
+
+WORKDIR /build
+
+# Copy workspace manifests first for dependency caching
+COPY Cargo.toml Cargo.lock* rust-toolchain.toml ./
+COPY crates/domain-models/Cargo.toml crates/domain-models/Cargo.toml
+COPY crates/audit-core/Cargo.toml crates/audit-core/Cargo.toml
+COPY crates/policy-engine/Cargo.toml crates/policy-engine/Cargo.toml
+COPY crates/tool-broker/Cargo.toml crates/tool-broker/Cargo.toml
+COPY crates/risk-engine/Cargo.toml crates/risk-engine/Cargo.toml
+COPY apps/api-rust/Cargo.toml apps/api-rust/Cargo.toml
+
+# Create dummy source files for dependency caching
+RUN mkdir -p crates/domain-models/src && echo "pub fn dummy() {}" > crates/domain-models/src/lib.rs && \
+    mkdir -p crates/audit-core/src && echo "pub fn dummy() {}" > crates/audit-core/src/lib.rs && \
+    mkdir -p crates/policy-engine/src && echo "pub fn dummy() {}" > crates/policy-engine/src/lib.rs && \
+    mkdir -p crates/tool-broker/src && echo "pub fn dummy() {}" > crates/tool-broker/src/lib.rs && \
+    mkdir -p crates/risk-engine/src && echo "pub fn dummy() {}" > crates/risk-engine/src/lib.rs && \
+    mkdir -p apps/api-rust/src && echo "fn main() {}" > apps/api-rust/src/main.rs
+
+# Build dependencies only (cached layer)
+RUN cargo build --release --bin cdsip-api 2>/dev/null || true
+
+# Copy actual source code
+COPY crates/ crates/
+COPY apps/api-rust/ apps/api-rust/
+
+# Touch files to invalidate cache for source changes
+RUN touch crates/domain-models/src/lib.rs \
+    crates/audit-core/src/lib.rs \
+    crates/policy-engine/src/lib.rs \
+    crates/tool-broker/src/lib.rs \
+    crates/risk-engine/src/lib.rs \
+    apps/api-rust/src/main.rs
+
+# Build the actual binary
+RUN cargo build --release --bin cdsip-api
+
+# =============================================================================
+# Runtime stage — minimal image
+# =============================================================================
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        nmap \
+        libssl3 \
+        && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Create non-root user
+    groupadd -r cdsip && \
+    useradd -r -g cdsip -d /app -s /sbin/nologin cdsip && \
+    mkdir -p /app/data /app/artifacts && \
+    chown -R cdsip:cdsip /app
+
+WORKDIR /app
+
+COPY --from=builder /build/target/release/cdsip-api /app/cdsip-api
+
+USER cdsip
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
+
+ENTRYPOINT ["/app/cdsip-api"]

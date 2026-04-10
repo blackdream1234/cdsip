@@ -1,0 +1,130 @@
+# =============================================================================
+# CDSIP — Docker Compose (Local Development)
+# =============================================================================
+# Usage:
+#   cp .env.example .env  (edit secrets!)
+#   docker compose up -d
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-bookworm
+    container_name: cdsip-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cdsip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cdsip_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cdsip}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cdsip}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cdsip-internal
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Database Migrator — runs migrations then exits
+  # ---------------------------------------------------------------------------
+  migrator:
+    image: postgres:16-bookworm
+    container_name: cdsip-migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-cdsip}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-cdsip_dev_password}
+      PGDATABASE: ${POSTGRES_DB:-cdsip}
+    volumes:
+      - ./infra/migrations:/migrations:ro
+      - ./infra/scripts:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/init-db.sh"]
+    networks:
+      - cdsip-internal
+
+  # ---------------------------------------------------------------------------
+  # Rust API Server
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: cdsip-api
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cdsip}:${POSTGRES_PASSWORD:-cdsip_dev_password}@postgres:5432/${POSTGRES_DB:-cdsip}
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND}
+      JWT_ACCESS_TOKEN_EXPIRY_SECS: ${JWT_ACCESS_TOKEN_EXPIRY_SECS:-900}
+      JWT_REFRESH_TOKEN_EXPIRY_SECS: ${JWT_REFRESH_TOKEN_EXPIRY_SECS:-604800}
+      CDSIP_ENVIRONMENT: ${CDSIP_ENVIRONMENT:-development}
+      RUST_LOG: ${RUST_LOG:-cdsip_api=debug,tower_http=debug}
+      NMAP_BINARY_PATH: /usr/bin/nmap
+      NMAP_TIMEOUT_SECS: ${NMAP_TIMEOUT_SECS:-300}
+      NMAP_MAX_CONCURRENT: ${NMAP_MAX_CONCURRENT:-2}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@cdsip.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-CHANGE_ME_admin_dev_password}
+    ports:
+      - "8080:8080"
+    networks:
+      - cdsip-internal
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Python Intelligence Service
+  # ---------------------------------------------------------------------------
+  intel:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.intel
+    container_name: cdsip-intel
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      INTEL_SERVICE_HOST: 0.0.0.0
+      INTEL_SERVICE_PORT: 8081
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cdsip}:${POSTGRES_PASSWORD:-cdsip_dev_password}@postgres:5432/${POSTGRES_DB:-cdsip}
+    ports:
+      - "8081:8081"
+    networks:
+      - cdsip-internal
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Next.js Web Dashboard (Dev Mode)
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web
+    container_name: cdsip-web
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    networks:
+      - cdsip-internal
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  cdsip-internal:
+    driver: bridge
