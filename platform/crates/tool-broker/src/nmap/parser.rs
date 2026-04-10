@@ -2,7 +2,7 @@
 //!
 //! Parses Nmap XML output into normalized scan findings.
 
-use serde::Deserialize;
+
 use crate::types::ToolError;
 
 /// Parsed host from Nmap XML.
@@ -160,7 +160,7 @@ pub fn parse_nmap_xml(xml_content: &str) -> Result<Vec<ParsedHost>, ToolError> {
                         }
                     }
                     b"port" => {
-                        if let (Some(ref mut host), Some(port)) = (&mut current_host, current_port.take()) {
+                        if let (Some(host), Some(port)) = (&mut current_host, current_port.take()) {
                             host.ports.push(port);
                         }
                     }

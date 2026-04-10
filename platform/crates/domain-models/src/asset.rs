@@ -66,6 +66,17 @@ pub enum AssetStatus {
     Unknown,
 }
 
+impl std::fmt::Display for AssetStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AssetStatus::Active => write!(f, "active"),
+            AssetStatus::Inactive => write!(f, "inactive"),
+            AssetStatus::Decommissioned => write!(f, "decommissioned"),
+            AssetStatus::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
 /// A discovered or registered asset (host, device, endpoint).
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Asset {

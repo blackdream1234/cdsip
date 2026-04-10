@@ -7,7 +7,6 @@ use uuid::Uuid;
 use validator::Validate;
 
 use cdsip_domain_models::scan::*;
-use cdsip_domain_models::risk::PaginatedResponse;
 use crate::errors::AppError;
 use crate::extractors::AppState;
 use crate::extractors::auth::{AuthUser, require_write};

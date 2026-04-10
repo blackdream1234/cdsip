@@ -7,7 +7,6 @@
 //! - No shell interpolation (uses Command directly)
 //! - Output captured and parsed, raw XML stored for audit
 
-use std::path::PathBuf;
 use std::time::Duration;
 use tokio::process::Command;
 use tracing::{info, warn, error};
@@ -161,7 +160,7 @@ impl ToolExecutorTrait for NmapExecutor {
             }
         };
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let _stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
         if !output.status.success() {

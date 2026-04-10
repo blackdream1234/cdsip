@@ -1,6 +1,6 @@
 //! Authentication extractor — validates JWT and extracts user claims.
 
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::HeaderMap;
 use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
