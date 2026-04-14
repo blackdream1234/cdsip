@@ -1,4 +1,4 @@
-//! Policy evaluator — loads rules from DB and evaluates requests.
+ //! Policy evaluator — loads rules from DB and evaluates requests.
 
 use cdsip_domain_models::policy::{PolicyRule, PolicyRequest, PolicyDecision, PolicyAction};
 use sqlx::PgPool;
@@ -63,12 +63,15 @@ impl PolicyEvaluator {
                 let decision = PolicyDecision {
                     decision_id: Uuid::now_v7(),
                     action,
-                    matched_policy_id: Some(rule.policy_id),
-                    matched_rule_id: Some(rule.id),
+                    matched_policy_ids: vec![rule.policy_id],
+                    matched_rule_ids: vec![rule.id],
                     reason: format!(
                         "Matched rule '{}' (type: {}, priority: {})",
                         rule.id, rule.rule_type, rule.priority
                     ),
+                    actor_id: Some(request.actor_id),
+                    environment: request.environment.clone(),
+                    request_id: request.request_id,
                     decided_at: Utc::now(),
                     approval_id: None,
                 };
@@ -94,9 +97,12 @@ impl PolicyEvaluator {
         Ok(PolicyDecision {
             decision_id: Uuid::now_v7(),
             action: PolicyAction::Deny,
-            matched_policy_id: None,
-            matched_rule_id: None,
+            matched_policy_ids: vec![],
+            matched_rule_ids: vec![],
             reason: "No matching policy rule found. Default action is DENY.".to_string(),
+            actor_id: Some(request.actor_id),
+            environment: request.environment.clone(),
+            request_id: request.request_id,
             decided_at: Utc::now(),
             approval_id: None,
         })

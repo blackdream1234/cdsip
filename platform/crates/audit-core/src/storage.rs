@@ -26,9 +26,9 @@ impl AuditStorage {
             INSERT INTO audit_events (
                 id, timestamp, actor_id, actor_role, action,
                 resource_type, resource_id, request_id, correlation_id,
-                policy_decision, environment, details, ip_address, user_agent
+                policy_decision, policy_decision_id, environment, details, ip_address, user_agent
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
             )
             "#,
         )
@@ -42,6 +42,7 @@ impl AuditStorage {
         .bind(event.request_id)
         .bind(event.correlation_id)
         .bind(&event.policy_decision)
+        .bind(event.policy_decision_id)
         .bind(&event.environment)
         .bind(&event.details)
         .bind(&event.ip_address)
@@ -61,7 +62,7 @@ impl AuditStorage {
             r#"
             SELECT id, timestamp, actor_id, actor_role, action,
                    resource_type, resource_id, request_id, correlation_id,
-                   policy_decision, environment, details, ip_address, user_agent
+                   policy_decision, policy_decision_id, environment, details, ip_address, user_agent
             FROM audit_events
             WHERE ($1::uuid IS NULL OR actor_id = $1)
               AND ($2::text IS NULL OR action = $2)
@@ -119,7 +120,7 @@ impl AuditStorage {
             r#"
             SELECT id, timestamp, actor_id, actor_role, action,
                    resource_type, resource_id, request_id, correlation_id,
-                   policy_decision, environment, details, ip_address, user_agent
+                   policy_decision, policy_decision_id, environment, details, ip_address, user_agent
             FROM audit_events
             WHERE id = $1
             "#,

@@ -3,6 +3,10 @@ name = "cdsip-api"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "cdsip_api"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cdsip-api"
 path = "src/main.rs"

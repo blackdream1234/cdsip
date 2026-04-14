@@ -109,3 +109,15 @@ pub async fn decide_approval(
 
     Ok(Json(approval))
 }
+
+/// GET /api/v1/policies/decisions/:id
+pub async fn get_policy_decision(
+    State(state): State<AppState>,
+    _auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<PolicyDecision>, AppError> {
+    let decision = state.policy_governor.get_policy_decision(id).await?
+        .ok_or_else(|| AppError::NotFound(format!("Policy decision {id} not found")))?;
+    
+    Ok(Json(decision))
+}

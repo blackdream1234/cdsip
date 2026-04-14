@@ -1,0 +1,104 @@
+name: CDSIP Release Gate (CI)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: postgres://cdsip:cdsip_dev_password@localhost:5432/cdsip
+
+jobs:
+  rust-backend:
+    name: Backend Security & Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cdsip
+          POSTGRES_PASSWORD: cdsip_dev_password
+          POSTGRES_DB: cdsip
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Rustfmt (Formatting)
+        run: cargo fmt --all --check
+
+      - name: Clippy (Linting)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Cargo Audit (Vulnerabilities)
+        run: cargo audit
+
+      - name: Run Tests
+        run: cargo test --workspace
+
+  python-intel:
+    name: Intelligence Service Integrity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/intel-python
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov black ruff types-requests fastapi[all]
+          
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Run PyTest
+        run: pytest --verbose
+
+  frontend-build:
+    name: UI Production Build 
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/web
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './apps/web/package-lock.json'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Typecheck & Build
+        run: npm run build

@@ -211,7 +211,116 @@ mod tests {
         assert_eq!(RuleEvaluator::parse_action("allow"), PolicyAction::Allow);
         assert_eq!(
             RuleEvaluator::parse_action("require_approval"),
-            PolicyAction::RequireApproval
+            PolicyAction::RequireApproval,
         );
+    }
+
+    #[test]
+    fn test_target_allowlist_exact_match() {
+        let rule = make_rule(
+            serde_json::json!({
+                "roles": ["admin"],
+                "action": "scan.execute",
+                "allowed_targets": ["192.168.100.10", "10.0.1.5"]
+            }),
+            "allow",
+            100,
+        );
+        let request = make_request("scan.execute", "admin", "lab");
+        assert!(RuleEvaluator::matches(&rule, &request));
+    }
+
+    #[test]
+    fn test_target_not_in_allowlist() {
+        let rule = make_rule(
+            serde_json::json!({
+                "roles": ["admin"],
+                "action": "scan.execute",
+                "allowed_targets": ["10.0.1.5", "10.0.1.6"]
+            }),
+            "allow",
+            100,
+        );
+        let request = make_request("scan.execute", "admin", "lab");
+        assert!(!RuleEvaluator::matches(&rule, &request));
+    }
+
+    #[test]
+    fn test_cidr_prefix_match() {
+        let rule = make_rule(
+            serde_json::json!({
+                "action": "scan.execute",
+                "allowed_targets": ["192.168.100.0/24"]
+            }),
+            "allow",
+            100,
+        );
+        let request = make_request("scan.execute", "admin", "lab");
+        assert!(RuleEvaluator::matches(&rule, &request));
+    }
+
+    #[test]
+    fn test_resource_type_match() {
+        let rule = make_rule(
+            serde_json::json!({
+                "resource_type": "scan",
+                "action": "scan.execute"
+            }),
+            "allow",
+            100,
+        );
+        let request = make_request("scan.execute", "admin", "lab");
+        assert!(RuleEvaluator::matches(&rule, &request));
+
+        let rule_incident = make_rule(
+            serde_json::json!({
+                "resource_type": "incident",
+                "action": "scan.execute"
+            }),
+            "allow",
+            100,
+        );
+        assert!(!RuleEvaluator::matches(&rule_incident, &request));
+    }
+
+    #[test]
+    fn test_multiple_conditions_all_must_match() {
+        let rule = make_rule(
+            serde_json::json!({
+                "roles": ["admin"],
+                "environment": "lab",
+                "action": "scan.execute",
+                "resource_type": "scan",
+                "allowed_targets": ["192.168.100.0/24"]
+            }),
+            "allow",
+            100,
+        );
+
+        // All match
+        let request = make_request("scan.execute", "admin", "lab");
+        assert!(RuleEvaluator::matches(&rule, &request));
+
+        // Wrong role
+        let bad_role = make_request("scan.execute", "read_only", "lab");
+        assert!(!RuleEvaluator::matches(&rule, &bad_role));
+
+        // Wrong env
+        let bad_env = make_request("scan.execute", "admin", "production");
+        assert!(!RuleEvaluator::matches(&rule, &bad_env));
+
+        // Wrong action
+        let bad_action = make_request("asset.create", "admin", "lab");
+        assert!(!RuleEvaluator::matches(&rule, &bad_action));
+    }
+
+    #[test]
+    fn test_parse_all_actions() {
+        assert_eq!(RuleEvaluator::parse_action("allow"), PolicyAction::Allow);
+        assert_eq!(RuleEvaluator::parse_action("deny"), PolicyAction::Deny);
+        assert_eq!(RuleEvaluator::parse_action("require_approval"), PolicyAction::RequireApproval);
+        assert_eq!(RuleEvaluator::parse_action("escalate"), PolicyAction::Escalate);
+        assert_eq!(RuleEvaluator::parse_action(""), PolicyAction::Deny);
+        assert_eq!(RuleEvaluator::parse_action("DROP TABLE"), PolicyAction::Deny);
     }
 }

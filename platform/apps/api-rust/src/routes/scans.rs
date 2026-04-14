@@ -152,17 +152,20 @@ pub async fn trigger_run(
     .await?
     .ok_or_else(|| AppError::NotFound("Scan target not found".to_string()))?;
 
-    // Create scan run record
+    // Create scan run record mapped to specific tool execution ID
     let run_id = Uuid::now_v7();
+    let execution_id = Uuid::now_v7(); // Pre-generate to pass to Broker
+
     let run = sqlx::query_as::<_, ScanRun>(
         r#"
-        INSERT INTO scan_runs (id, scan_job_id, status, started_at)
-        VALUES ($1, $2, 'running', NOW())
+        INSERT INTO scan_runs (id, scan_job_id, status, started_at, execution_id)
+        VALUES ($1, $2, 'running', NOW(), $3)
         RETURNING *
         "#,
     )
     .bind(run_id)
     .bind(job_id)
+    .bind(execution_id)
     .fetch_one(&state.pool)
     .await?;
 
@@ -182,7 +185,7 @@ pub async fn trigger_run(
         });
 
         let result = broker
-            .execute("nmap", params, actor_id, &actor_role, &environment, Uuid::now_v7())
+            .execute("nmap", params, actor_id, &actor_role, &environment, Uuid::now_v7(), execution_id)
             .await;
 
         match result {

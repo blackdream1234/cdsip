@@ -7,7 +7,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 /// Policy actions — the outcome of a policy evaluation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "varchar", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyAction {
     Allow,
@@ -44,23 +45,30 @@ pub struct PolicyRequest {
     pub target: Option<String>,
     /// Environment context.
     pub environment: String,
+    /// Tracking origin request UUID.
+    pub request_id: Uuid,
     /// Additional context for rule evaluation.
     pub context: serde_json::Value,
 }
 
 /// The Policy Governor's decision.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PolicyDecision {
     /// Unique ID for this decision (for audit trail).
     pub decision_id: Uuid,
     /// The action taken.
     pub action: PolicyAction,
     /// Which policy matched (if any).
-    pub matched_policy_id: Option<Uuid>,
+    pub matched_policy_ids: Vec<Uuid>,
     /// Which rule matched (if any).
-    pub matched_rule_id: Option<Uuid>,
+    pub matched_rule_ids: Vec<Uuid>,
     /// Human-readable reason for the decision.
     pub reason: String,
+    
+    pub actor_id: Option<Uuid>,
+    pub environment: String,
+    pub request_id: Uuid,
+
     /// When the decision was made.
     pub decided_at: DateTime<Utc>,
     /// If RequireApproval, the approval ID to track.

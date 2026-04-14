@@ -86,9 +86,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/incidents", get(routes::incidents::list_incidents).post(routes::incidents::create_incident))
         .route("/incidents/{id}", get(routes::incidents::get_incident).put(routes::incidents::update_incident))
         .route("/incidents/{id}/evidence", post(routes::incidents::link_evidence))
-        // Policies
         .route("/policies", get(routes::policies::list_policies).post(routes::policies::create_policy))
         .route("/policies/{id}", get(routes::policies::get_policy))
+        .route("/policies/decisions/{id}", get(routes::policies::get_policy_decision))
         .route("/policies/{id}/rules", post(routes::policies::add_rule))
         .route("/approvals", get(routes::policies::list_approvals))
         .route("/approvals/{id}/decide", post(routes::policies::decide_approval))
@@ -97,7 +97,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/audit/{id}", get(routes::audit::get_audit_event))
         // Risk
         .route("/risk/calculate/{asset_id}", post(routes::risk::calculate_risk))
-        .route("/risk/scores", get(routes::risk::list_risk_scores));
+        .route("/risk/scores", get(routes::risk::list_risk_scores))
+        // System
+        .route("/system/status", get(routes::system::system_status));
 
     Router::new()
         .nest("/api/v1", api_routes)

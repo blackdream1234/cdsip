@@ -16,6 +16,7 @@ It does NOT:
 from fastapi import FastAPI
 from intel_service.config import settings
 from intel_service.routes.health import router as health_router
+from intel_service.routes.anomaly import router as anomaly_router
 
 app = FastAPI(
     title="CDSIP Intelligence Service",
@@ -26,6 +27,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(anomaly_router)
 
 
 @app.on_event("startup")

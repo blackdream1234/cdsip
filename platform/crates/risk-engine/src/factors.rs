@@ -192,4 +192,28 @@ mod tests {
         assert!(!is_risky_service("nginx"));
         assert!(!is_risky_service("http"));
     }
+
+    #[test]
+    fn test_maximum_risk_bounds() {
+        let input = RiskInput {
+            asset_id: Uuid::now_v7(),
+            asset_criticality: 5,
+            open_port_count: 500, // beyond max clamps at 1.0 (50)
+            risky_service_count: 50, // beyond max clamps at 1.0 (5)
+            new_ports_since_last_scan: 100, // beyond max clamps at 1.0 (10)
+            service_changes_since_last_scan: 50, // beyond max clamps at 1.0 (5)
+            failed_policy_requests: 100, // beyond max clamps at 1.0 (10)
+            high_severity_findings: 100, // beyond max clamps at 1.0 (10)
+            days_since_last_scan: 300, // beyond max clamps at 1.0 (30)
+        };
+        let factors = calculate_factors(&input);
+        let total: f64 = factors.iter().map(|f| f.contribution).sum();
+        
+        // Due to floats, it might be 0.999999
+        assert!((total - 1.0).abs() < f64::EPSILON, "Maximum risk must clamp perfectly to 1.0 (100)");
+
+        for f in factors {
+            assert!(f.value <= 1.0, "Factor {} exceeded 1.0", f.name);
+        }
+    }
 }

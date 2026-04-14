@@ -139,6 +139,7 @@ pub struct ScanRun {
     pub findings_count: i32,
     pub raw_artifact_path: Option<String>,
     pub error_message: Option<String>,
+    pub execution_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
 }
 

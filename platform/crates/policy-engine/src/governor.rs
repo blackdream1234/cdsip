@@ -52,6 +52,26 @@ impl PolicyGovernor {
             );
         }
 
+        // Insert decision into DB natively to guarantee complete traceability
+        sqlx::query(
+            r#"
+            INSERT INTO policy_decisions 
+                (id, outcome, matched_rule_ids, rationale, actor_id, environment, request_id, timestamp)
+            VALUES 
+                ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(decision.decision_id)
+        .bind(decision.action.to_string())
+        .bind(&decision.matched_rule_ids)
+        .bind(&decision.reason)
+        .bind(decision.actor_id)
+        .bind(&decision.environment)
+        .bind(decision.request_id)
+        .bind(decision.decided_at)
+        .execute(&self.pool)
+        .await?;
+
         Ok(decision)
     }
 
@@ -78,7 +98,7 @@ impl PolicyGovernor {
             "#,
         )
         .bind(approval_id)
-        .bind(decision.matched_rule_id)
+        .bind(decision.matched_rule_ids.first().copied())
         .bind(request.actor_id)
         .bind(serde_json::to_value(request).map_err(|e| PolicyError::EvaluationError(e.to_string()))?)
         .bind(expires_at)
@@ -137,6 +157,32 @@ impl PolicyGovernor {
         .await?;
 
         Ok(policies)
+    }
+
+    /// Get a policy decision by ID.
+    pub async fn get_policy_decision(&self, decision_id: Uuid) -> Result<Option<PolicyDecision>, PolicyError> {
+        let decision = sqlx::query_as::<_, PolicyDecision>(
+            r#"
+            SELECT 
+                id as decision_id, 
+                outcome as action, 
+                matched_rule_ids, 
+                '{}'::uuid[] as matched_policy_ids, 
+                rationale as reason, 
+                actor_id, 
+                environment, 
+                request_id, 
+                timestamp as decided_at, 
+                NULL::uuid as approval_id 
+            FROM policy_decisions 
+            WHERE id = $1
+            "#,
+        )
+        .bind(decision_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(decision)
     }
 
     /// Get a policy by ID.

@@ -19,6 +19,7 @@ pub struct AuditEvent {
     pub request_id: Uuid,
     pub correlation_id: Option<Uuid>,
     pub policy_decision: Option<String>,
+    pub policy_decision_id: Option<Uuid>,
     pub environment: String,
     pub details: serde_json::Value,
     pub ip_address: Option<String>,
@@ -37,6 +38,7 @@ pub struct AuditEventBuilder {
     resource_id: Option<Uuid>,
     correlation_id: Option<Uuid>,
     policy_decision: Option<String>,
+    policy_decision_id: Option<Uuid>,
     details: serde_json::Value,
     ip_address: Option<String>,
     user_agent: Option<String>,
@@ -55,6 +57,7 @@ impl AuditEventBuilder {
             resource_id: None,
             correlation_id: None,
             policy_decision: None,
+            policy_decision_id: None,
             details: serde_json::json!({}),
             ip_address: None,
             user_agent: None,
@@ -79,6 +82,11 @@ impl AuditEventBuilder {
 
     pub fn policy_decision(mut self, decision: impl Into<String>) -> Self {
         self.policy_decision = Some(decision.into());
+        self
+    }
+
+    pub fn policy_decision_id(mut self, id: Uuid) -> Self {
+        self.policy_decision_id = Some(id);
         self
     }
 
@@ -110,6 +118,7 @@ impl AuditEventBuilder {
             request_id: self.request_id,
             correlation_id: self.correlation_id,
             policy_decision: self.policy_decision,
+            policy_decision_id: self.policy_decision_id,
             environment: self.environment,
             details: self.details,
             ip_address: self.ip_address,

@@ -77,6 +77,7 @@ impl ToolBroker {
         actor_role: &str,
         environment: &str,
         request_id: Uuid,
+        execution_id: Uuid,
     ) -> Result<ToolOutput, ToolError> {
         let registry = self.registry.read().await;
 
@@ -117,6 +118,7 @@ impl ToolBroker {
             resource_id: None,
             target,
             environment: environment.to_string(),
+            request_id,
             context: serde_json::json!({
                 "tool_id": tool_id,
                 "params": params,
@@ -161,7 +163,6 @@ impl ToolBroker {
         }
 
         // 6. Record execution start
-        let execution_id = Uuid::now_v7();
         self.record_execution_start(
             execution_id,
             tool_id,
@@ -169,6 +170,7 @@ impl ToolBroker {
             actor_id,
             &params,
             environment,
+            policy_decision.decision_id,
         )
         .await?;
 
@@ -207,11 +209,12 @@ impl ToolBroker {
         requested_by: Uuid,
         input_params: &Value,
         environment: &str,
+        policy_decision_id: Uuid,
     ) -> Result<(), ToolError> {
         sqlx::query(
             r#"
-            INSERT INTO tool_executions (id, tool_id, tool_version, requested_by, input_params, status, started_at, environment)
-            VALUES ($1, $2, $3, $4, $5, 'running', NOW(), $6)
+            INSERT INTO tool_executions (id, tool_id, tool_version, requested_by, input_params, status, started_at, environment, policy_decision_id)
+            VALUES ($1, $2, $3, $4, $5, 'running', NOW(), $6, $7)
             "#,
         )
         .bind(id)
@@ -220,6 +223,7 @@ impl ToolBroker {
         .bind(requested_by)
         .bind(input_params)
         .bind(environment)
+        .bind(policy_decision_id)
         .execute(&self.pool)
         .await?;
 

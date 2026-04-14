@@ -238,3 +238,73 @@ impl ToolExecutorTrait for NmapExecutor {
         "1.0.0"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_target_valid() {
+        let valid = vec![
+            "192.168.1.1",
+            "10.0.0.0/8",
+            "example.com",
+            "srv-db-01",
+            "fe80::1",
+        ];
+
+        for t in valid {
+            let params = serde_json::json!({ "target": t });
+            let result = NmapExecutor::parse_target(&params);
+            assert!(result.is_ok(), "Target {} should be valid", t);
+            assert_eq!(result.unwrap(), t);
+        }
+    }
+
+    #[test]
+    fn test_parse_target_invalid_characters() {
+        let invalid = vec![
+            "192.168.1.1;",
+            "10.0.0.0/8|",
+            "example.com&",
+            "`whoami`",
+            "$(id)",
+            "127.0.0.1\n",
+            "127.0.0.1\r",
+            "10.0.0.1 && echo hack",
+        ];
+
+        for t in invalid {
+            let params = serde_json::json!({ "target": t });
+            let result = NmapExecutor::parse_target(&params);
+            assert!(
+                result.is_err(),
+                "Target {} contains forbidden characters and should be rejected",
+                t
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_profile_valid() {
+        let profiles = vec![
+            ("host_discovery", ScanProfile::HostDiscovery),
+            ("safe_tcp_scan", ScanProfile::SafeTcpScan),
+            ("service_detection", ScanProfile::ServiceDetection),
+        ];
+
+        for (name, expected) in profiles {
+            let params = serde_json::json!({ "profile": name });
+            let result = NmapExecutor::parse_profile(&params);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_parse_profile_invalid() {
+        let params = serde_json::json!({ "profile": "aggressive_scan" });
+        let result = NmapExecutor::parse_profile(&params);
+        assert!(result.is_err());
+    }
+}
